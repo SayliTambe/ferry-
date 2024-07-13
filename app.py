@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from datetime import date
+from datetime import date, datetime, timedelta
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Sayli%40123@localhost/promotion_ferry'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Sayli%401234@localhost/promotion_ferry'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -57,6 +57,28 @@ def get_promotions():
         })
     return jsonify({'promotions': promotion_list})
 
+@app.route('/promotions/current_month')
+def get_current_month_promotions():
+    today = date.today()
+    first_day = today.replace(day=1)
+    last_day = (datetime(today.year, today.month + 1, 1) - timedelta(days=1)).date()
+
+    promotions = Promotion.query.filter(
+        Promotion.from_date >= first_day,
+        Promotion.from_date <= last_day
+    ).all()
+
+    promotion_list = []
+    for promo in promotions:
+        promotion_list.append({
+            'title': promo.title,
+            'code': promo.code,
+            'from_date': promo.from_date,
+            'to_date': promo.to_date,
+            'percentage': promo.percentage
+        })
+    return jsonify({'promotions': promotion_list})
+
 @app.route('/delete_promotion/<string:code>', methods=['DELETE'])
 def delete_promotion(code):
     promotion = Promotion.query.filter_by(code=code).first_or_404()
@@ -85,16 +107,5 @@ def modify_promotion(code):
     db.session.commit()
     return jsonify({'message': 'Promotion modified successfully.'})
 
-def delete_expired_promotions():
-    today = date.today()
-    expired_promotions = Promotion.query.filter(Promotion.to_date < today).all()
-
-    for promo in expired_promotions:
-        db.session.delete(promo)
-
-    db.session.commit()
-
 if __name__ == '__main__':
-    with app.app_context():
-        delete_expired_promotions()
     app.run(debug=True)

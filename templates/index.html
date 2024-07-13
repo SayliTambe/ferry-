@@ -62,11 +62,11 @@
     .header h1 {
       margin: 0;
       font-size: 3em;
-      color: #3498db; /* Light blue color */
+      color: #3498db;
     }
     .header p {
       font-size: 1.5em;
-      color: #3498db; /* Light blue color */
+      color: #3498db;
     }
     .promotions {
       margin: 20px;
@@ -86,7 +86,7 @@
       color: black;
     }
     .action-btn {
-      background-color: #7dc6e9; /* Red color */
+      background-color: #7dc6e9;
       color: white;
       border: none;
       padding: 10px 20px;
@@ -111,7 +111,7 @@
       width: 200px;
     }
     .code-list button {
-      background-color: #77bae3; /* Red color */
+      background-color: #77bae3;
       color: white;
       border: none;
       padding: 10px;
@@ -245,46 +245,104 @@
 
     function showPromotions() {
       hideAllSections();
+      fetch('/promotions/current_month')
+        .then(response => response.json())
+        .then(data => {
+          const promotionTableBody = document.getElementById('promotionTableBody');
+          promotionTableBody.innerHTML = '';
+
+          if (data.promotions.length === 0) {
+            alert("No promotions available for the current month.");
+            return;
+          }
+
+          data.promotions.forEach(promo => {
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+              <td>${promo.title}</td>
+              <td class="promotion-code">${promo.code}</td>
+              <td>${promo.from_date}</td>
+              <td>${promo.to_date}</td>
+              <td>${promo.percentage}</td>
+              <td><button class="remove-btn" onclick="removePromoCode(this)">Remove</button> <button class="modify-btn" onclick="populateModifyForm('${promo.title}', '${promo.code}', '${promo.from_date}', '${promo.to_date}', '${promo.percentage}')">Modify</button></td>
+            `;
+            promotionTableBody.appendChild(newRow);
+          });
+
+          document.getElementById('promotions').style.display = 'block';
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function showModifyPromotionOptions() {
+      hideAllSections();
+      const codeList = document.getElementById('codeList');
+      codeList.innerHTML = '';
       fetch('/promotions')
-      .then(response => response.json())
-      .then(data => {
-        const promotionTableBody = document.getElementById('promotionTableBody');
-        promotionTableBody.innerHTML = '';
+        .then(response => response.json())
+        .then(data => {
+          if (data.promotions.length === 0) {
+            alert("No promotions available to modify.");
+            return;
+          }
 
-        if (data.promotions.length === 0) {
-          alert("No promotions available.");
-          return;
-        }
+          data.promotions.forEach(promo => {
+            const button = document.createElement('button');
+            button.textContent = promo.code;
+            button.onclick = () => populateModifyForm(promo.title, promo.code, promo.from_date, promo.to_date, promo.percentage);
+            codeList.appendChild(button);
+          });
 
-        data.promotions.forEach(promo => {
-          const newRow = document.createElement('tr');
-          newRow.innerHTML = `
-            <td>${promo.title}</td>
-            <td class="promotion-code">${promo.code}</td>
-            <td>${promo.from_date}</td>
-            <td>${promo.to_date}</td>
-            <td>${promo.percentage}</td>
-            <td><button class="remove-btn" onclick="removePromoCode(this)">Remove</button> <button class="modify-btn" onclick="populateModifyForm('${promo.title}', '${promo.code}', '${promo.from_date}', '${promo.to_date}', '${promo.percentage}')">Modify</button></td>
-          `;
-          promotionTableBody.appendChild(newRow);
-        });
+          document.getElementById('codeList').style.display = 'flex';
+        })
+        .catch(error => console.error('Error:', error));
+    }
 
-        document.getElementById('promotions').style.display = 'block';
-      })
-      .catch(error => console.error('Error:', error));
+    function showDeletePromotionOptions() {
+      hideAllSections();
+      const codeList = document.getElementById('codeList');
+      codeList.innerHTML = '';
+      fetch('/promotions')
+        .then(response => response.json())
+        .then(data => {
+          if (data.promotions.length === 0) {
+            alert("No promotions available to delete.");
+            return;
+          }
+
+          data.promotions.forEach(promo => {
+            const button = document.createElement('button');
+            button.textContent = promo.code;
+            button.onclick = () => deletePromotion(promo.code);
+            codeList.appendChild(button);
+          });
+
+          document.getElementById('codeList').style.display = 'flex';
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function deletePromotion(code) {
+      if (confirm(`Are you sure you want to delete promotion with code: ${code}?`)) {
+        fetch(`/delete_promotion/${code}`, {
+          method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+          alert(data.message);
+          showDeletePromotionOptions();
+        })
+        .catch(error => console.error('Error:', error));
+      }
     }
 
     function populateModifyForm(title, code, fromDate, toDate, percentage) {
+      hideAllSections();
       document.getElementById('modifyTitle').value = title;
       document.getElementById('modifyCode').value = code;
       document.getElementById('modifyFromDate').value = fromDate;
       document.getElementById('modifyToDate').value = toDate;
       document.getElementById('modifyPercentage').value = percentage;
-      showModifyForm();
-    }
-
-    function showModifyForm() {
-      hideAllSections();
       document.getElementById('modifyForm').style.display = 'flex';
     }
 
@@ -317,79 +375,8 @@
         })
         .catch(error => console.error('Error:', error));
       } else {
-        alert("All fields are required to modify the promotion.");
+        alert("All fields are required to modify a promotion.");
       }
-    }
-
-    function autoDeleteExpiredPromotions() {
-      const today = new Date().toISOString().split('T')[0];
-      const promotionTableBody = document.getElementById('promotionTableBody');
-      const rows = promotionTableBody.querySelectorAll('tr');
-
-      rows.forEach(row => {
-        const toDate = row.querySelector('td:nth-child(4)').textContent;
-        if (toDate < today) {
-          const code = row.querySelector('.promotion-code').textContent;
-          fetch(`/delete_promotion/${code}`, {
-            method: 'DELETE'
-          })
-          .then(response => response.json())
-          .then(data => {
-            console.log(`Promotion with code ${code} deleted.`);
-          })
-          .catch(error => console.error('Error:', error));
-        }
-      });
-
-      showPromotions();
-    }
-
-    function showModifyPromotionOptions() {
-      hideAllSections();
-      const codeListContainer = document.getElementById('codeList');
-      codeListContainer.innerHTML = '';
-      fetch('/promotions')
-        .then(response => response.json())
-        .then(data => {
-          data.promotions.forEach(promo => {
-            const button = document.createElement('button');
-            button.textContent = `${promo.title} (${promo.code})`;
-            button.onclick = () => populateModifyForm(promo.title, promo.code, promo.from_date, promo.to_date, promo.percentage);
-            codeListContainer.appendChild(button);
-          });
-          codeListContainer.style.display = 'flex';
-        })
-        .catch(error => console.error('Error:', error));
-    }
-
-    function showDeletePromotionOptions() {
-      hideAllSections();
-      const codeListContainer = document.getElementById('codeList');
-      codeListContainer.innerHTML = '';
-      fetch('/promotions')
-        .then(response => response.json())
-        .then(data => {
-          data.promotions.forEach(promo => {
-            const button = document.createElement('button');
-            button.textContent = `${promo.title} (${promo.code})`;
-            button.onclick = () => removePromoCodeFromSidebar(promo.code);
-            codeListContainer.appendChild(button);
-          });
-          codeListContainer.style.display = 'flex';
-        })
-        .catch(error => console.error('Error:', error));
-    }
-
-    function removePromoCodeFromSidebar(code) {
-      fetch(`/delete_promotion/${code}`, {
-        method: 'DELETE'
-      })
-      .then(response => response.json())
-      .then(data => {
-        alert(data.message);
-        showPromotions();
-      })
-      .catch(error => console.error('Error:', error));
     }
 
     function hideAllSections() {
@@ -398,8 +385,6 @@
       document.getElementById('promotions').style.display = 'none';
       document.getElementById('codeList').style.display = 'none';
     }
-
-    setInterval(autoDeleteExpiredPromotions, 24 * 60 * 60 * 1000); // Run once a day
   </script>
 </body>
 </html>
