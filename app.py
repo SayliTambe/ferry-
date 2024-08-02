@@ -3,14 +3,14 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime, timedelta
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Sayli%401234@localhost/promotion_ferry'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Sayli%40123@localhost/promotion_ferry'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 class Promotion(db.Model):
     __tablename__ = 'promotion'
-    title = db.Column(db.String(100), nullable=False, primary_key=True)
-    code = db.Column(db.String(20), nullable=False, unique=True)
+    title = db.Column(db.String(100), nullable=False)
+    code = db.Column(db.String(20), nullable=False, unique=True, primary_key=True)
     from_date = db.Column(db.Date, nullable=False)
     to_date = db.Column(db.Date, nullable=False)
     percentage = db.Column(db.Integer, nullable=False)
@@ -61,11 +61,12 @@ def get_promotions():
 def get_current_month_promotions():
     today = date.today()
     first_day = today.replace(day=1)
-    last_day = (datetime(today.year, today.month + 1, 1) - timedelta(days=1)).date()
+    next_month = today.replace(day=28) + timedelta(days=4)
+    last_day = next_month.replace(day=1) - timedelta(days=1)
 
     promotions = Promotion.query.filter(
         Promotion.from_date >= first_day,
-        Promotion.from_date <= last_day
+        Promotion.to_date <= last_day
     ).all()
 
     promotion_list = []
@@ -78,6 +79,20 @@ def get_current_month_promotions():
             'percentage': promo.percentage
         })
     return jsonify({'promotions': promotion_list})
+
+@app.route('/view_promotions')
+def view_promotions():
+    today = date.today()
+    first_day = today.replace(day=1)
+    next_month = today.replace(day=28) + timedelta(days=4)
+    last_day = next_month.replace(day=1) - timedelta(days=1)
+
+    promotions = Promotion.query.filter(
+        Promotion.from_date >= first_day,
+        Promotion.to_date <= last_day
+    ).all()
+
+    return render_template('view_promotions.html', promotions=promotions)
 
 @app.route('/delete_promotion/<string:code>', methods=['DELETE'])
 def delete_promotion(code):
